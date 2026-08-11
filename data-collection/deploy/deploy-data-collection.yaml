@@ -386,7 +386,19 @@ Conditions:
   ProdCFNTemplateUsed: !Equals [ !Ref CFNSourceBucket,  'aws-managed-cost-intelligence-dashboards' ]
   NeedDataBucketsKms: !Not [ !Equals [ !Ref DataBucketsKmsKeysArns, "" ] ]
   DeployIncludeReferenceModule: !Equals [ !Ref IncludeReferenceModule, "yes"]
-  
+
+Rules:
+  # Guard: an enabled Kiro module must be given at least one source bucket.
+  # Without this, KiroSourceBuckets="" flows into the module's CommaDelimitedList
+  # as [""], and its Fn::ForEach would emit a bucket-read policy with an empty
+  # ARN (arn:aws:s3:::) and an empty logical-ID suffix. Reject at stack-create
+  # time instead so no malformed IAM policy is ever created.
+  KiroSourceBucketsRequiredWhenModuleEnabled:
+    RuleCondition: !Equals [ !Ref IncludeKiroUserActivityModule, "yes" ]
+    Assertions:
+      - Assert: !Not [ !Equals [ !Ref KiroSourceBuckets, "" ] ]
+        AssertDescription: "IncludeKiroUserActivityModule is 'yes' but KiroSourceBuckets is empty. Provide at least one source bucket name (comma-separated)."
+
 Resources:
   S3Bucket:
     Type: 'AWS::S3::Bucket'
